@@ -348,6 +348,29 @@ app.get('/api/analytics/dashboard', async (req, res) => {
   }
 });
 
+// ✅ Route to get all users
+app.get('/api/users', async (req, res) => {
+  try {
+    const users = await db.collection('users').find({}, { projection: { password: 0 } }).toArray(); // hide passwords
+    res.status(200).json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error.message);
+    res.status(500).json({ message: 'Failed to fetch users' });
+  }
+});
+
+// ✅ Route to get all transactions
+app.get('/api/transactions', async (req, res) => {
+  try {
+    const transactions = await db.collection('transactions').find().toArray();
+    res.status(200).json(transactions);
+  } catch (error) {
+    console.error('Error fetching transactions:', error.message);
+    res.status(500).json({ message: 'Failed to fetch transactions' });
+  }
+});
+
+
 // Start server
 connectToMongoDB().then(() => {
   app.listen(PORT, '0.0.0.0', () => {

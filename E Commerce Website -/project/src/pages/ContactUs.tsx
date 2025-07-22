@@ -18,7 +18,7 @@ const ContactUs: React.FC = () => {
     setLoading(true);
     
     try {
-      await axios.post('http://localhost:3002/api/contact', formData);
+      await axios.post('https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/contact', formData);
       setSubmitted(true);
       setFormData({ name: '', email: '', subject: '', message: '' });
     } catch (error) {

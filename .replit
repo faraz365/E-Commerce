@@ -23,7 +23,7 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd \"E Commerce Website -/project\" && npm run server"
+args = "npm run server"
 
 [[workflows.workflow]]
 name = "Start Full Application"
@@ -32,11 +32,11 @@ mode = "parallel"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd \"E Commerce Website -/project\" && npm run server"
+args = "npm run server"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd \"E Commerce Website -/project\" && npm run dev"
+args = "npm run dev"
 
 [[workflows.workflow]]
 name = "Start Frontend Only"
@@ -45,7 +45,7 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd \"E Commerce Website -/project\" && npm run dev"
+args = "npm run dev"
 
 [[ports]]
 localPort = 5000

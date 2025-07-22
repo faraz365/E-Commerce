@@ -33,6 +33,22 @@ app.use(express.json());
 
 // Routes
 
+// Root route
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'E-commerce API Server is running!',
+    status: 'success',
+    endpoints: {
+      auth: '/api/auth/login, /api/auth/register',
+      products: '/api/products',
+      categories: '/api/categories',
+      orders: '/api/orders',
+      cart: '/api/cart',
+      analytics: '/api/analytics/dashboard'
+    }
+  });
+});
+
 // User Authentication Routes
 app.post('/api/auth/register', async (req, res) => {
   try {

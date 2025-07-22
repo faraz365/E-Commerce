@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useSocket } from '../hooks/useSocket';
 import { 
   Shield, LogOut, Home, Plus, Edit, Trash2, Users, Package, 
   ShoppingCart, DollarSign, Eye, X, Save, AlertCircle
@@ -55,12 +56,61 @@ const AdminDashboard: React.FC = () => {
   const [editingItem, setEditingItem] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState<'success' | 'error'>('success');
   
   const { user, logout } = useAuth();
+  const socket = useSocket();
 
   useEffect(() => {
     fetchAllData();
   }, []);
+
+  // Socket event listeners for real-time updates
+  useEffect(() => {
+    if (!socket) return;
+
+    // Product events
+    socket.on('productAdded', (newProduct: Product) => {
+      setProducts(prev => [...prev, newProduct]);
+      showMessage('New product added!', 'success');
+    });
+
+    socket.on('productUpdated', (updatedProduct: Product) => {
+      setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+      showMessage('Product updated!', 'success');
+    });
+
+    socket.on('productDeleted', ({ id }: { id: string }) => {
+      setProducts(prev => prev.filter(p => p.id !== parseInt(id)));
+      showMessage('Product deleted!', 'success');
+    });
+
+    // Category events
+    socket.on('categoryAdded', (newCategory: Category) => {
+      setCategories(prev => [...prev, newCategory]);
+      showMessage('New category added!', 'success');
+    });
+
+    socket.on('categoryUpdated', (updatedCategory: Category) => {
+      setCategories(prev => prev.map(c => c.id === updatedCategory.id ? updatedCategory : c));
+      showMessage('Category updated!', 'success');
+    });
+
+    socket.on('categoryDeleted', ({ id }: { id: string }) => {
+      setCategories(prev => prev.filter(c => c.id !== parseInt(id)));
+      showMessage('Category deleted!', 'success');
+    });
+
+    // Cleanup listeners
+    return () => {
+      socket.off('productAdded');
+      socket.off('productUpdated');
+      socket.off('productDeleted');
+      socket.off('categoryAdded');
+      socket.off('categoryUpdated');
+      socket.off('categoryDeleted');
+    };
+  }, [socket]);
 
   const fetchAllData = async () => {
     try {
@@ -82,8 +132,9 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const showMessage = (msg: string) => {
+  const showMessage = (msg: string, type: 'success' | 'error' = 'success') => {
     setMessage(msg);
+    setMessageType(type);
     setTimeout(() => setMessage(''), 3000);
   };
 
@@ -98,7 +149,7 @@ const AdminDashboard: React.FC = () => {
         price: '',
         image_url: '',
         stock: '',
-        category_id: categories[0]?.id || 1
+        category_id: categories.length > 0 ? categories[0].id : ''
       });
     } else {
       setFormData(item || { name: '', description: '' });
@@ -116,29 +167,50 @@ const AdminDashboard: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate form data
+    if (modalType === 'product') {
+      if (!formData.name?.trim() || !formData.description?.trim() || 
+          !formData.price || !formData.image_url?.trim() || 
+          formData.stock === '' || !formData.category_id) {
+        showMessage('Please fill in all required fields', 'error');
+        return;
+      }
+      
+      if (isNaN(formData.price) || isNaN(formData.stock) || isNaN(formData.category_id)) {
+        showMessage('Price, stock, and category must be valid numbers', 'error');
+        return;
+      }
+    } else {
+      if (!formData.name?.trim() || !formData.description?.trim()) {
+        showMessage('Please fill in all required fields', 'error');
+        return;
+      }
+    }
+    
     try {
       if (modalType === 'product') {
         if (editingItem) {
           await axios.put(`https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/products/${editingItem.id}`, formData);
-          showMessage('Product updated successfully!');
+          showMessage('Product updated successfully!', 'success');
         } else {
           await axios.post('https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/products', formData);
-          showMessage('Product created successfully!');
+          showMessage('Product created successfully!', 'success');
         }
       } else {
         if (editingItem) {
           await axios.put(`https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/categories/${editingItem.id}`, formData);
-          showMessage('Category updated successfully!');
+          showMessage('Category updated successfully!', 'success');
         } else {
           await axios.post('https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/categories', formData);
-          showMessage('Category created successfully!');
+          showMessage('Category created successfully!', 'success');
         }
       }
       
       closeModal();
-      fetchAllData();
+      // No need to fetch data again as socket will handle real-time updates
     } catch (error) {
-      showMessage('Operation failed. Please try again.');
+      const errorMessage = error.response?.data?.message || 'Operation failed. Please try again.';
+      showMessage(errorMessage, 'error');
     }
   };
 
@@ -148,35 +220,36 @@ const AdminDashboard: React.FC = () => {
     try {
       if (type === 'product') {
         await axios.delete(`https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/products/${id}`);
-        showMessage('Product deleted successfully!');
+        showMessage('Product deleted successfully!', 'success');
       } else {
         await axios.delete(`https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/categories/${id}`);
-        showMessage('Category deleted successfully!');
+        showMessage('Category deleted successfully!', 'success');
       }
       
-      fetchAllData();
+      // No need to fetch data again as socket will handle real-time updates
     } catch (error) {
-      showMessage('Delete failed. Please try again.');
+      const errorMessage = error.response?.data?.message || 'Delete failed. Please try again.';
+      showMessage(errorMessage, 'error');
     }
   };
 
   const updateTransactionStatus = async (id: number, status: string) => {
     try {
       await axios.put(`https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/transactions/${id}`, { status });
-      showMessage('Transaction status updated!');
+      showMessage('Transaction status updated!', 'success');
       fetchAllData();
     } catch (error) {
-      showMessage('Update failed. Please try again.');
+      showMessage('Update failed. Please try again.', 'error');
     }
   };
 
   const updateUserRole = async (id: number, role: string) => {
     try {
       await axios.put(`https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/users/${id}`, { role });
-      showMessage('User role updated!');
+      showMessage('User role updated!', 'success');
       fetchAllData();
     } catch (error) {
-      showMessage('Update failed. Please try again.');
+      showMessage('Update failed. Please try again.', 'error');
     }
   };
 
@@ -231,9 +304,17 @@ const AdminDashboard: React.FC = () => {
 
       {message && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-green-500" />
-            <span className="text-green-700">{message}</span>
+          <div className={`border rounded-lg p-4 flex items-center gap-2 ${
+            messageType === 'success' 
+              ? 'bg-green-50 border-green-200' 
+              : 'bg-red-50 border-red-200'
+          }`}>
+            <AlertCircle className={`h-5 w-5 ${
+              messageType === 'success' ? 'text-green-500' : 'text-red-500'
+            }`} />
+            <span className={messageType === 'success' ? 'text-green-700' : 'text-red-700'}>
+              {message}
+            </span>
           </div>
         </div>
       )}
@@ -613,6 +694,7 @@ const AdminDashboard: React.FC = () => {
                       onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                     >
+                      <option value="">Select a category</option>
                       {categories.map((category) => (
                         <option key={category.id} value={category.id}>
                           {category.name}

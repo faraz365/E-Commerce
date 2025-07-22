@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
+import { useSocket } from '../hooks/useSocket';
 import { ShoppingCart, User, LogOut, Store, Search, ChevronRight, Plus } from 'lucide-react';
 import axios from 'axios';
 import Footer from './Footer';
@@ -39,6 +40,7 @@ const Home: React.FC = () => {
   
   const { user, logout } = useAuth();
   const { getTotalItems, addToCart } = useCart();
+  const socket = useSocket();
 
   const heroSlides: HeroSlide[] = [
     {
@@ -75,6 +77,47 @@ const Home: React.FC = () => {
     
     return () => clearInterval(interval);
   }, []);
+
+  // Socket event listeners for real-time updates
+  useEffect(() => {
+    if (!socket) return;
+
+    // Product events
+    socket.on('productAdded', (newProduct: Product) => {
+      setProducts(prev => [...prev, newProduct]);
+    });
+
+    socket.on('productUpdated', (updatedProduct: Product) => {
+      setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+    });
+
+    socket.on('productDeleted', ({ id }: { id: string }) => {
+      setProducts(prev => prev.filter(p => p.id !== parseInt(id)));
+    });
+
+    // Category events
+    socket.on('categoryAdded', (newCategory: Category) => {
+      setCategories(prev => [...prev, newCategory]);
+    });
+
+    socket.on('categoryUpdated', (updatedCategory: Category) => {
+      setCategories(prev => prev.map(c => c.id === updatedCategory.id ? updatedCategory : c));
+    });
+
+    socket.on('categoryDeleted', ({ id }: { id: string }) => {
+      setCategories(prev => prev.filter(c => c.id !== parseInt(id)));
+    });
+
+    // Cleanup listeners
+    return () => {
+      socket.off('productAdded');
+      socket.off('productUpdated');
+      socket.off('productDeleted');
+      socket.off('categoryAdded');
+      socket.off('categoryUpdated');
+      socket.off('categoryDeleted');
+    };
+  }, [socket]);
 
   const fetchProducts = async () => {
     try {

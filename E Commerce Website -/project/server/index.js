@@ -4,10 +4,19 @@ import { MongoClient, ObjectId } from 'mongodb';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 
 dotenv.config();
 
 const app = express();
+const server = createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 const PORT = process.env.PORT || 5000;
 
 // MongoDB connection
@@ -31,6 +40,14 @@ async function connectToMongoDB() {
 app.use(cors());
 app.use(express.json());
 
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+  
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
+});
 // Routes
 
 // Root route
@@ -127,50 +144,119 @@ app.get('/api/products/:id', async (req, res) => {
 
 app.post('/api/products', async (req, res) => {
   try {
+    // Validate required fields
+    const { name, description, price, image_url, stock, category_id } = req.body;
+    
+    if (!name || !description || !price || !image_url || stock === undefined || !category_id) {
+      return res.status(400).json({ 
+        message: 'All fields are required: name, description, price, image_url, stock, category_id' 
+      });
+    }
+
+    // Validate data types
+    if (isNaN(price) || isNaN(stock) || isNaN(category_id)) {
+      return res.status(400).json({ 
+        message: 'Price, stock, and category_id must be valid numbers' 
+      });
+    }
+
     const product = {
-      ...req.body,
+      name: name.trim(),
+      description: description.trim(),
+      price: parseFloat(price),
+      image_url: image_url.trim(),
+      stock: parseInt(stock),
+      category_id: parseInt(category_id),
       created_at: new Date()
     };
 
     const result = await db.collection('products').insertOne(product);
+    
+    // Get the created product with its ID
+    const createdProduct = await db.collection('products').findOne({ _id: result.insertedId });
+    
+    // Emit real-time update to all connected clients
+    io.emit('productAdded', createdProduct);
+    
     res.status(201).json({ 
       message: 'Product created successfully', 
-      productId: result.insertedId 
+      productId: result.insertedId,
+      product: createdProduct
     });
   } catch (error) {
+    console.error('Error creating product:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
 app.put('/api/products/:id', async (req, res) => {
   try {
+    const { name, description, price, image_url, stock, category_id } = req.body;
+    
+    // Validate required fields
+    if (!name || !description || !price || !image_url || stock === undefined || !category_id) {
+      return res.status(400).json({ 
+        message: 'All fields are required: name, description, price, image_url, stock, category_id' 
+      });
+    }
+
+    // Validate data types
+    if (isNaN(price) || isNaN(stock) || isNaN(category_id)) {
+      return res.status(400).json({ 
+        message: 'Price, stock, and category_id must be valid numbers' 
+      });
+    }
+
+    const updateData = {
+      name: name.trim(),
+      description: description.trim(),
+      price: parseFloat(price),
+      image_url: image_url.trim(),
+      stock: parseInt(stock),
+      category_id: parseInt(category_id),
+      updated_at: new Date()
+    };
+
     const result = await db.collection('products').updateOne(
       { _id: new ObjectId(req.params.id) },
-      { $set: { ...req.body, updated_at: new Date() } }
+      { $set: updateData }
     );
 
     if (result.matchedCount === 0) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
+    // Get the updated product
+    const updatedProduct = await db.collection('products').findOne({ _id: new ObjectId(req.params.id) });
+    
+    // Emit real-time update to all connected clients
+    io.emit('productUpdated', updatedProduct);
+
     res.json({ message: 'Product updated successfully' });
   } catch (error) {
+    console.error('Error updating product:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
 app.delete('/api/products/:id', async (req, res) => {
   try {
+    const productId = req.params.id;
+    
     const result = await db.collection('products').deleteOne({ 
-      _id: new ObjectId(req.params.id) 
+      _id: new ObjectId(productId) 
     });
 
     if (result.deletedCount === 0) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
+    // Emit real-time update to all connected clients
+    io.emit('productDeleted', { id: productId });
+
     res.json({ message: 'Product deleted successfully' });
   } catch (error) {
+    console.error('Error deleting product:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -187,17 +273,110 @@ app.get('/api/categories', async (req, res) => {
 
 app.post('/api/categories', async (req, res) => {
   try {
+    // Validate required fields
+    const { name, description } = req.body;
+    
+    if (!name || !description) {
+      return res.status(400).json({ 
+        message: 'Name and description are required' 
+      });
+    }
+
     const category = {
-      ...req.body,
+      name: name.trim(),
+      description: description.trim(),
       created_at: new Date()
     };
 
     const result = await db.collection('categories').insertOne(category);
+    
+    // Get the created category with its ID
+    const createdCategory = await db.collection('categories').findOne({ _id: result.insertedId });
+    
+    // Emit real-time update to all connected clients
+    io.emit('categoryAdded', createdCategory);
+    
     res.status(201).json({ 
       message: 'Category created successfully', 
-      categoryId: result.insertedId 
+      categoryId: result.insertedId,
+      category: createdCategory
     });
   } catch (error) {
+    console.error('Error creating category:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Update category route
+app.put('/api/categories/:id', async (req, res) => {
+  try {
+    const { name, description } = req.body;
+    
+    // Validate required fields
+    if (!name || !description) {
+      return res.status(400).json({ 
+        message: 'Name and description are required' 
+      });
+    }
+
+    const updateData = {
+      name: name.trim(),
+      description: description.trim(),
+      updated_at: new Date()
+    };
+
+    const result = await db.collection('categories').updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: updateData }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+
+    // Get the updated category
+    const updatedCategory = await db.collection('categories').findOne({ _id: new ObjectId(req.params.id) });
+    
+    // Emit real-time update to all connected clients
+    io.emit('categoryUpdated', updatedCategory);
+
+    res.json({ message: 'Category updated successfully' });
+  } catch (error) {
+    console.error('Error updating category:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Delete category route
+app.delete('/api/categories/:id', async (req, res) => {
+  try {
+    const categoryId = req.params.id;
+    
+    // Check if there are products using this category
+    const productsUsingCategory = await db.collection('products').countDocuments({ 
+      category_id: parseInt(categoryId) 
+    });
+    
+    if (productsUsingCategory > 0) {
+      return res.status(400).json({ 
+        message: `Cannot delete category. ${productsUsingCategory} products are using this category.` 
+      });
+    }
+    
+    const result = await db.collection('categories').deleteOne({ 
+      _id: new ObjectId(categoryId) 
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+
+    // Emit real-time update to all connected clients
+    io.emit('categoryDeleted', { id: categoryId });
+
+    res.json({ message: 'Category deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting category:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -373,7 +552,7 @@ app.get('/api/transactions', async (req, res) => {
 
 // Start server
 connectToMongoDB().then(() => {
-  app.listen(PORT, '0.0.0.0', () => {
+  server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
   });
 });

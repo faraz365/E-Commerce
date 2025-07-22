@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 
+// Set the base URL for API calls
+const API_BASE_URL = 'http://localhost:5000';
+
 interface User {
   id: number;
   name: string;

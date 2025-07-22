@@ -4,6 +4,9 @@ import { ChevronLeft, Star, AlertCircle } from 'lucide-react';
 import axios from 'axios';
 import { Package } from 'lucide-react';
 
+// API Base URL
+const API_BASE_URL = 'https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev';
+
 interface Product {
   id: number;
   name: string;
@@ -45,14 +48,14 @@ const CategoryPage: React.FC = () => {
         // For "All Products" (id=0)
         if (categoryId === 0) {
           setCategory({ id: 0, name: "All Products", description: "Browse all our products" });
-          const productsRes = await axios.get('https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/products');
+          const productsRes = await axios.get(`${API_BASE_URL}/api/products`);
           setProducts(productsRes.data);
           return;
         }
 
         // For specific categories
         try {
-          const categoryRes = await axios.get(`https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/categories/${categoryId}`);
+          const categoryRes = await axios.get(`${API_BASE_URL}/api/categories/${categoryId}`);
           setCategory(categoryRes.data);
         } catch (err) {
           setError("Category not found");
@@ -60,7 +63,7 @@ const CategoryPage: React.FC = () => {
         }
 
         // Fetch products
-        const productsRes = await axios.get('https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/products');
+        const productsRes = await axios.get(`${API_BASE_URL}/api/products`);
         const filteredProducts = productsRes.data.filter(
           (p: Product) => p.category_id === categoryId
         );

@@ -5,6 +5,9 @@ import { useCart } from '../contexts/CartContext';
 import { ArrowLeft, ShoppingCart, Star, Package, Truck, Shield, Heart, Plus, Minus } from 'lucide-react';
 import axios from 'axios';
 
+// API Base URL
+const API_BASE_URL = 'https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev';
+
 interface Product {
   id: number;
   name: string;
@@ -35,7 +38,7 @@ const ProductDetail: React.FC = () => {
 
   const fetchProduct = async (productId: number) => {
     try {
-      const response = await axios.get(`https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/products/${productId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/products/${productId}`);
       setProduct(response.data);
     } catch (error) {
       console.error('Error fetching product:', error);

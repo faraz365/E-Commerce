@@ -4,6 +4,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { User, Package, ShoppingBag, LogOut, Home, Clock, CheckCircle, Truck, AlertCircle } from 'lucide-react';
 import axios from 'axios';
 
+// API Base URL
+const API_BASE_URL = 'https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev';
+
 interface Order {
   id: number;
   user_id: number;
@@ -39,7 +42,7 @@ const UserDashboard: React.FC = () => {
   const fetchOrders = async () => {
     try {
       // Fetch orders instead of transactions
-      const response = await axios.get(`https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/orders?user_id=${user?.id}`);
+      const response = await axios.get(`${API_BASE_URL}/api/orders?user_id=${user?.id}`);
       const userOrders = response.data;
       setOrders(userOrders);
       

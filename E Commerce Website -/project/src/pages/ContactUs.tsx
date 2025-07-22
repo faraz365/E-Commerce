@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import { Mail, Phone, MapPin, Home, ArrowLeft, MessageSquare, Instagram, Send } from 'lucide-react';
 import axios from 'axios';
 
+// API Base URL
+const API_BASE_URL = 'https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev';
+
 const ContactUs: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
@@ -18,7 +21,7 @@ const ContactUs: React.FC = () => {
     setLoading(true);
     
     try {
-      await axios.post('https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/contact', formData);
+      await axios.post(`${API_BASE_URL}/api/contact`, formData);
       setSubmitted(true);
       setFormData({ name: '', email: '', subject: '', message: '' });
     } catch (error) {

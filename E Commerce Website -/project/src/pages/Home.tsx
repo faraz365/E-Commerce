@@ -7,6 +7,9 @@ import { ShoppingCart, User, LogOut, Store, Search, ChevronRight, Plus } from 'l
 import axios from 'axios';
 import Footer from './Footer';
 
+// API Base URL
+const API_BASE_URL = 'https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev';
+
 interface Product {
   id: number;
   name: string;
@@ -121,7 +124,7 @@ const Home: React.FC = () => {
 
   const fetchProducts = async () => {
     try {
-      const response = await axios.get('https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/products');
+      const response = await axios.get(`${API_BASE_URL}/api/products`);
       setProducts(response.data);
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -132,7 +135,7 @@ const Home: React.FC = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get('https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/categories');
+      const response = await axios.get(`${API_BASE_URL}/api/categories`);
       setCategories(response.data);
     } catch (error) {
       console.error('Error fetching categories:', error);

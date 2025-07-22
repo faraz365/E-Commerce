@@ -8,6 +8,9 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 
+// API Base URL
+const API_BASE_URL = 'https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev';
+
 interface Product {
   id: number;
   name: string;
@@ -115,10 +118,10 @@ const AdminDashboard: React.FC = () => {
   const fetchAllData = async () => {
     try {
       const [productsRes, categoriesRes, usersRes, transactionsRes] = await Promise.all([
-        axios.get('https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/products'),
-        axios.get('https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/categories'),
-        axios.get('https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/users'),
-        axios.get('https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/transactions')
+        axios.get(`${API_BASE_URL}/api/products`),
+        axios.get(`${API_BASE_URL}/api/categories`),
+        axios.get(`${API_BASE_URL}/api/users`),
+        axios.get(`${API_BASE_URL}/api/transactions`)
       ]);
       
       setProducts(productsRes.data);
@@ -190,18 +193,18 @@ const AdminDashboard: React.FC = () => {
     try {
       if (modalType === 'product') {
         if (editingItem) {
-          await axios.put(`https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/products/${editingItem.id}`, formData);
+          await axios.put(`${API_BASE_URL}/api/products/${editingItem.id}`, formData);
           showMessage('Product updated successfully!', 'success');
         } else {
-          await axios.post('https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/products', formData);
+          await axios.post(`${API_BASE_URL}/api/products`, formData);
           showMessage('Product created successfully!', 'success');
         }
       } else {
         if (editingItem) {
-          await axios.put(`https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/categories/${editingItem.id}`, formData);
+          await axios.put(`${API_BASE_URL}/api/categories/${editingItem.id}`, formData);
           showMessage('Category updated successfully!', 'success');
         } else {
-          await axios.post('https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/categories', formData);
+          await axios.post(`${API_BASE_URL}/api/categories`, formData);
           showMessage('Category created successfully!', 'success');
         }
       }
@@ -219,10 +222,10 @@ const AdminDashboard: React.FC = () => {
     
     try {
       if (type === 'product') {
-        await axios.delete(`https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/products/${id}`);
+        await axios.delete(`${API_BASE_URL}/api/products/${id}`);
         showMessage('Product deleted successfully!', 'success');
       } else {
-        await axios.delete(`https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/categories/${id}`);
+        await axios.delete(`${API_BASE_URL}/api/categories/${id}`);
         showMessage('Category deleted successfully!', 'success');
       }
       
@@ -235,7 +238,7 @@ const AdminDashboard: React.FC = () => {
 
   const updateTransactionStatus = async (id: number, status: string) => {
     try {
-      await axios.put(`https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/transactions/${id}`, { status });
+      await axios.put(`${API_BASE_URL}/api/orders/${id}`, { status });
       showMessage('Transaction status updated!', 'success');
       fetchAllData();
     } catch (error) {
@@ -245,7 +248,7 @@ const AdminDashboard: React.FC = () => {
 
   const updateUserRole = async (id: number, role: string) => {
     try {
-      await axios.put(`https://5a312d61-cda0-4de1-a8e9-97dbb3fc6107-00-35o6ocl1ielmf.sisko.replit.dev/api/users/${id}`, { role });
+      await axios.put(`${API_BASE_URL}/api/users/${id}`, { role });
       showMessage('User role updated!', 'success');
       fetchAllData();
     } catch (error) {

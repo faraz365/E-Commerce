@@ -1,11 +1,12 @@
+
 import express from 'express';
 import cors from 'cors';
-import mysql from 'mysql2/promise';
+import { MongoClient, ObjectId } from 'mongodb';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-dotenv.config();
 
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3002; 
@@ -14,7 +15,7 @@ const PORT = process.env.PORT || 3002;
 app.use(cors());
 app.use(express.json());
 
-// Simple in-memory data for demo (when MySQL is not available)
+// Simple in-memory data for demo (when MongoDB is not available)
 let users = [
   { id: 1, name: 'Admin User', email: 'admin@admin.com', password: 'admin123', role: 'admin', created_at: new Date() },
   { id: 2, name: 'Amir Khan', email: 'user@user.com', password: 'user123', role: 'user', created_at: new Date() }
@@ -62,154 +63,39 @@ let nextCategoryId = 4;
 let nextOrderId = 2;
 let nextContactId = 1;
 
-// MySQL Connection
+// MongoDB Connection
 let db = null;
+let client = null;
 
 // Get current directory path
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '.env') });
 
+// MongoDB connection URL
+const MONGODB_URI = 'mongodb+srv://farazabdullah267:SjgRgW3SlAAa05Rl@project.ifut3ay.mongodb.net/';
 
-// Initialize database connection
+// Initialize MongoDB connection
 async function initDB() {
   try {
-  const dbConfig = {
-  host: process.env.HOST,
-  user: process.env.USER,
-  password: process.env.PASSWORD,
-  database: process.env.DATABASE,
-  connectTimeout: 10000
-};
-
-
-
-
-// Load .env file from same directory
-
-console.log('Current directory:', __dirname);
-console.log('Environment Variables:', {
-  HOST: process.env.HOST,
-  USER: process.env.USER,
-  PASSWORD: process.env.PASSWORD,
-  DATABASE: process.env.DATABASE,
-  PORT: process.env.PORT
-});
+    console.log('Connecting to MongoDB Atlas...');
     
+    client = new MongoClient(MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
     
-    // Try to connect to MySQL with timeout
-    db = await mysql.createConnection(dbConfig);
+    await client.connect();
+    db = client.db('ecommerce_db');
     
-    // Test the connection
-    await db.ping();
-    
-    console.log('Connected to MySQL database');
-    await createTables();
+    console.log('Connected to MongoDB Atlas');
     await insertSampleData();
-    console.log('Database tables created and sample data inserted');
+    console.log('Sample data inserted');
   } catch (error) {
-    console.log(' MySQL not available, using in-memory data for demo');
-    console.log('   This is normal if you don\'t have MySQL installed or running');
+    console.log('MongoDB not available, using in-memory data for demo');
+    console.log('This is normal if you don\'t have MongoDB Atlas access');
+    console.log('Error:', error.message);
     db = null;
-  }
-}
-
-// Create tables if MySQL is available
-async function createTables() {
-  if (!db) return;
-
-  try {
-    // Create Users table
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS Users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        email VARCHAR(100) UNIQUE NOT NULL,
-        password VARCHAR(100) NOT NULL,
-        role ENUM('admin', 'user') DEFAULT 'user',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Create Categories table
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS Categories (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        description TEXT
-      )
-    `);
-
-    // Create Products table
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS Products (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(200) NOT NULL,
-        description TEXT,
-        price DECIMAL(10, 2) NOT NULL,
-        image_url VARCHAR(500),
-        stock INT DEFAULT 0,
-        category_id INT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (category_id) REFERENCES Categories(id)
-      )
-    `);
-
-    // Create Transactions table
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS Transactions (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT,
-        product_id INT,
-        quantity INT NOT NULL,
-        status ENUM('ordered', 'shipped', 'delivered', 'cancelled') DEFAULT 'ordered',
-        transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES Users(id),
-        FOREIGN KEY (product_id) REFERENCES Products(id)
-      )
-    `);
-
-    // Create Orders table
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS Orders (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT,
-        total_amount DECIMAL(10, 2) NOT NULL,
-        status ENUM('ordered', 'shipped', 'delivered', 'cancelled') DEFAULT 'ordered',
-        delivery_info JSON,
-        payment_method VARCHAR(50),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES Users(id)
-      )
-    `);
-
-    // Create Order Items table
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS OrderItems (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        order_id INT,
-        product_id INT,
-        product_name VARCHAR(200),
-        quantity INT NOT NULL,
-        price DECIMAL(10, 2) NOT NULL,
-        FOREIGN KEY (order_id) REFERENCES Orders(id),
-        FOREIGN KEY (product_id) REFERENCES Products(id)
-      )
-    `);
-
-    // Create Contact Messages table
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS ContactMessages (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        email VARCHAR(100) NOT NULL,
-        subject VARCHAR(200) NOT NULL,
-        message TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-  } catch (error) {
-    console.error('Error creating tables:', error);
   }
 }
 
@@ -219,45 +105,91 @@ async function insertSampleData() {
 
   try {
     // Insert sample users
-    await db.execute(`
-      INSERT IGNORE INTO Users (id, name, email, password, role) VALUES 
-      (1, 'Admin User', 'admin@admin.com', 'admin123', 'admin'),
-      (2, 'John Doe', 'user@user.com', 'user123', 'user')
-    `);
+    const usersCollection = db.collection('users');
+    const existingUsers = await usersCollection.countDocuments();
+    if (existingUsers === 0) {
+      await usersCollection.insertMany([
+        { id: 1, name: 'Admin User', email: 'admin@admin.com', password: 'admin123', role: 'admin', created_at: new Date() },
+        { id: 2, name: 'John Doe', email: 'user@user.com', password: 'user123', role: 'user', created_at: new Date() }
+      ]);
+    }
 
     // Insert sample categories
-    await db.execute(`
-      INSERT IGNORE INTO Categories (id, name, description) VALUES 
-      (1, 'Shirts', 'Stylish shirts for all occasions'),
-      (2, 'Pants', 'Comfortable and trendy pants'),
-      (3, 'Shoes', 'Quality footwear for every style')
-    `);
+    const categoriesCollection = db.collection('categories');
+    const existingCategories = await categoriesCollection.countDocuments();
+    if (existingCategories === 0) {
+      await categoriesCollection.insertMany([
+        { id: 1, name: 'Shirts', description: 'Stylish shirts for all occasions' },
+        { id: 2, name: 'Pants', description: 'Comfortable and trendy pants' },
+        { id: 3, name: 'Shoes', description: 'Quality footwear for every style' }
+      ]);
+    }
 
     // Insert sample products
-    await db.execute(`
-      INSERT IGNORE INTO Products (id, name, description, price, image_url, stock, category_id) VALUES 
-      (1, 'Classic White Shirt', 'Elegant white cotton shirt perfect for office and casual wear', 29.99, 'https://images.pexels.com/photos/996329/pexels-photo-996329.jpeg', 50, 1),
-      (2, 'Blue Denim Jeans', 'Comfortable blue denim jeans with modern fit', 49.99, 'https://images.pexels.com/photos/1598505/pexels-photo-1598505.jpeg', 35, 2),
-      (3, 'Black Leather Shoes', 'Premium black leather dress shoes for formal occasions', 89.99, 'https://images.pexels.com/photos/267301/pexels-photo-267301.jpeg', 25, 3)
-    `);
+    const productsCollection = db.collection('products');
+    const existingProducts = await productsCollection.countDocuments();
+    if (existingProducts === 0) {
+      await productsCollection.insertMany([
+        { id: 1, name: 'Classic White Shirt', description: 'Elegant white cotton shirt perfect for office and casual wear', price: 29.99, image_url: 'https://images.pexels.com/photos/996329/pexels-photo-996329.jpeg', stock: 50, category_id: 1, created_at: new Date() },
+        { id: 2, name: 'Blue Denim Jeans', description: 'Comfortable blue denim jeans with modern fit', price: 49.99, image_url: 'https://images.pexels.com/photos/1598505/pexels-photo-1598505.jpeg', stock: 35, category_id: 2, created_at: new Date() },
+        { id: 3, name: 'Black Leather Shoes', description: 'Premium black leather dress shoes for formal occasions', price: 89.99, image_url: 'https://images.pexels.com/photos/267301/pexels-photo-267301.jpeg', stock: 25, category_id: 3, created_at: new Date() }
+      ]);
+    }
 
     // Insert sample transactions
-    await db.execute(`
-      INSERT IGNORE INTO Transactions (id, user_id, product_id, quantity, status, transaction_date) VALUES 
-      (1, 2, 1, 2, 'delivered', '2024-01-15'),
-      (2, 2, 3, 1, 'shipped', '2024-01-20')
-    `);
+    const transactionsCollection = db.collection('transactions');
+    const existingTransactions = await transactionsCollection.countDocuments();
+    if (existingTransactions === 0) {
+      await transactionsCollection.insertMany([
+        { id: 1, user_id: 2, product_id: 1, quantity: 2, status: 'delivered', transaction_date: new Date('2024-01-15') },
+        { id: 2, user_id: 2, product_id: 3, quantity: 1, status: 'shipped', transaction_date: new Date('2024-01-20') }
+      ]);
+    }
+
+    // Get next IDs from existing data
+    const maxUser = await usersCollection.findOne({}, { sort: { id: -1 } });
+    nextUserId = maxUser ? maxUser.id + 1 : 3;
+
+    const maxProduct = await productsCollection.findOne({}, { sort: { id: -1 } });
+    nextProductId = maxProduct ? maxProduct.id + 1 : 4;
+
+    const maxCategory = await categoriesCollection.findOne({}, { sort: { id: -1 } });
+    nextCategoryId = maxCategory ? maxCategory.id + 1 : 4;
+
+    const maxTransaction = await transactionsCollection.findOne({}, { sort: { id: -1 } });
+    nextTransactionId = maxTransaction ? maxTransaction.id + 1 : 3;
+
+    const maxOrder = await db.collection('orders').findOne({}, { sort: { id: -1 } });
+    nextOrderId = maxOrder ? maxOrder.id + 1 : 2;
+
+    const maxContact = await db.collection('contactMessages').findOne({}, { sort: { id: -1 } });
+    nextContactId = maxContact ? maxContact.id + 1 : 1;
+
   } catch (error) {
     console.error('Error inserting sample data:', error);
   }
 }
 
 // Helper function to get data from DB or memory
-async function getFromDB(query, params = []) {
+async function getFromDB(collection, query = {}, options = {}) {
   if (db) {
     try {
-      const [rows] = await db.execute(query, params);
-      return rows;
+      const result = await db.collection(collection).find(query, options).toArray();
+      return result;
+    } catch (error) {
+      console.error('Database query failed:', error);
+      return null;
+    }
+  }
+  return null;
+}
+
+// Helper function to get single document from DB
+async function getOneFromDB(collection, query = {}) {
+  if (db) {
+    try {
+      const result = await db.collection(collection).findOne(query);
+      return result;
     } catch (error) {
       console.error('Database query failed:', error);
       return null;
@@ -272,9 +204,9 @@ app.post('/api/signup', async (req, res) => {
 
   try {
     // Check if user exists in DB
-    const existingUser = await getFromDB('SELECT id FROM Users WHERE email = ?', [email]);
+    const existingUser = await getOneFromDB('users', { email });
     
-    if (existingUser && existingUser.length > 0) {
+    if (existingUser) {
       return res.status(400).json({ message: 'Account already exists' });
     }
 
@@ -286,12 +218,17 @@ app.post('/api/signup', async (req, res) => {
 
     // Create new user
     if (db) {
-      await db.execute(
-        'INSERT INTO Users (name, email, password, role) VALUES (?, ?, ?, ?)',
-        [name, email, password, role]
-      );
-      const [newUser] = await db.execute('SELECT * FROM Users WHERE email = ?', [email]);
-      return res.json({ user: newUser[0] });
+      const newUser = {
+        id: nextUserId++,
+        name,
+        email,
+        password,
+        role,
+        created_at: new Date()
+      };
+      
+      await db.collection('users').insertOne(newUser);
+      return res.json({ user: newUser });
     } else {
       // Use memory
       const newUser = {
@@ -316,10 +253,10 @@ app.post('/api/login', async (req, res) => {
 
   try {
     // Check in DB first
-    const dbUser = await getFromDB('SELECT * FROM Users WHERE email = ? AND password = ?', [email, password]);
+    const dbUser = await getOneFromDB('users', { email, password });
     
-    if (dbUser && dbUser.length > 0) {
-      return res.json({ user: dbUser[0] });
+    if (dbUser) {
+      return res.json({ user: dbUser });
     }
 
     // Check memory data
@@ -338,7 +275,7 @@ app.post('/api/login', async (req, res) => {
 // Product Routes
 app.get('/api/products', async (req, res) => {
   try {
-    const dbProducts = await getFromDB('SELECT * FROM Products');
+    const dbProducts = await getFromDB('products');
     res.json(dbProducts || products);
   } catch (error) {
     res.json(products);
@@ -348,9 +285,9 @@ app.get('/api/products', async (req, res) => {
 app.get('/api/products/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const dbProduct = await getFromDB('SELECT * FROM Products WHERE id = ?', [id]);
-    if (dbProduct && dbProduct.length > 0) {
-      return res.json(dbProduct[0]);
+    const dbProduct = await getOneFromDB('products', { id: parseInt(id) });
+    if (dbProduct) {
+      return res.json(dbProduct);
     }
     
     const product = products.find(p => p.id === parseInt(id));
@@ -369,12 +306,19 @@ app.post('/api/products', async (req, res) => {
   
   try {
     if (db) {
-      await db.execute(
-        'INSERT INTO Products (name, description, price, image_url, stock, category_id) VALUES (?, ?, ?, ?, ?, ?)',
-        [name, description, price, image_url, stock, category_id]
-      );
-      const [newProduct] = await db.execute('SELECT * FROM Products WHERE name = ? ORDER BY id DESC LIMIT 1', [name]);
-      res.json(newProduct[0]);
+      const newProduct = {
+        id: nextProductId++,
+        name,
+        description,
+        price: parseFloat(price),
+        image_url,
+        stock: parseInt(stock),
+        category_id: parseInt(category_id),
+        created_at: new Date()
+      };
+      
+      await db.collection('products').insertOne(newProduct);
+      res.json(newProduct);
     } else {
       const newProduct = {
         id: nextProductId++,
@@ -401,12 +345,22 @@ app.put('/api/products/:id', async (req, res) => {
   
   try {
     if (db) {
-      await db.execute(
-        'UPDATE Products SET name = ?, description = ?, price = ?, image_url = ?, stock = ?, category_id = ? WHERE id = ?',
-        [name, description, price, image_url, stock, category_id, id]
+      const updateData = {
+        name,
+        description,
+        price: parseFloat(price),
+        image_url,
+        stock: parseInt(stock),
+        category_id: parseInt(category_id)
+      };
+      
+      await db.collection('products').updateOne(
+        { id: parseInt(id) },
+        { $set: updateData }
       );
-      const [updatedProduct] = await db.execute('SELECT * FROM Products WHERE id = ?', [id]);
-      res.json(updatedProduct[0]);
+      
+      const updatedProduct = await getOneFromDB('products', { id: parseInt(id) });
+      res.json(updatedProduct);
     } else {
       const productIndex = products.findIndex(p => p.id === parseInt(id));
       if (productIndex !== -1) {
@@ -435,7 +389,7 @@ app.delete('/api/products/:id', async (req, res) => {
   
   try {
     if (db) {
-      await db.execute('DELETE FROM Products WHERE id = ?', [id]);
+      await db.collection('products').deleteOne({ id: parseInt(id) });
       res.json({ message: 'Product deleted successfully' });
     } else {
       const productIndex = products.findIndex(p => p.id === parseInt(id));
@@ -455,7 +409,7 @@ app.delete('/api/products/:id', async (req, res) => {
 // Category Routes
 app.get('/api/categories', async (req, res) => {
   try {
-    const dbCategories = await getFromDB('SELECT * FROM Categories');
+    const dbCategories = await getFromDB('categories');
     res.json(dbCategories || categories);
   } catch (error) {
     res.json(categories);
@@ -469,10 +423,8 @@ app.get('/api/categories/:id', async (req, res) => {
     let category, productsByCategory;
 
     if (db) {
-      const [catRows] = await db.execute('SELECT * FROM Categories WHERE id = ?', [id]);
-      category = catRows[0] || null;
-      const [prodRows] = await db.execute('SELECT * FROM Products WHERE category_id = ?', [id]);
-      productsByCategory = prodRows;
+      category = await getOneFromDB('categories', { id: parseInt(id) });
+      productsByCategory = await getFromDB('products', { category_id: parseInt(id) });
     } else {
       category = categories.find(c => c.id === parseInt(id)) || null;
       productsByCategory = products.filter(p => p.category_id === parseInt(id));
@@ -494,12 +446,14 @@ app.post('/api/categories', async (req, res) => {
   
   try {
     if (db) {
-      await db.execute(
-        'INSERT INTO Categories (name, description) VALUES (?, ?)',
-        [name, description]
-      );
-      const [newCategory] = await db.execute('SELECT * FROM Categories WHERE name = ? ORDER BY id DESC LIMIT 1', [name]);
-      res.json(newCategory[0]);
+      const newCategory = {
+        id: nextCategoryId++,
+        name,
+        description
+      };
+      
+      await db.collection('categories').insertOne(newCategory);
+      res.json(newCategory);
     } else {
       const newCategory = {
         id: nextCategoryId++,
@@ -521,12 +475,13 @@ app.put('/api/categories/:id', async (req, res) => {
   
   try {
     if (db) {
-      await db.execute(
-        'UPDATE Categories SET name = ?, description = ? WHERE id = ?',
-        [name, description, id]
+      await db.collection('categories').updateOne(
+        { id: parseInt(id) },
+        { $set: { name, description } }
       );
-      const [updatedCategory] = await db.execute('SELECT * FROM Categories WHERE id = ?', [id]);
-      res.json(updatedCategory[0]);
+      
+      const updatedCategory = await getOneFromDB('categories', { id: parseInt(id) });
+      res.json(updatedCategory);
     } else {
       const categoryIndex = categories.findIndex(c => c.id === parseInt(id));
       if (categoryIndex !== -1) {
@@ -551,7 +506,7 @@ app.delete('/api/categories/:id', async (req, res) => {
   
   try {
     if (db) {
-      await db.execute('DELETE FROM Categories WHERE id = ?', [id]);
+      await db.collection('categories').deleteOne({ id: parseInt(id) });
       res.json({ message: 'Category deleted successfully' });
     } else {
       const categoryIndex = categories.findIndex(c => c.id === parseInt(id));
@@ -571,8 +526,7 @@ app.delete('/api/categories/:id', async (req, res) => {
 // User Routes (Admin only)
 app.get('/api/users', async (req, res) => {
   try {
-    
-    const dbUsers = await getFromDB('SELECT id, name, email, role, created_at FROM Users');
+    const dbUsers = await getFromDB('users', {}, { projection: { password: 0 } });
     res.json(dbUsers || users.map(u => ({ ...u, password: undefined })));
   } catch (error) {
     res.json(users.map(u => ({ ...u, password: undefined })));
@@ -585,9 +539,14 @@ app.put('/api/users/:id', async (req, res) => {
   
   try {
     if (db) {
-      await db.execute('UPDATE Users SET role = ? WHERE id = ?', [role, id]);
-      const [updatedUser] = await db.execute('SELECT id, name, email, role, created_at FROM Users WHERE id = ?', [id]);
-      res.json(updatedUser[0]);
+      await db.collection('users').updateOne(
+        { id: parseInt(id) },
+        { $set: { role } }
+      );
+      
+      const updatedUser = await getOneFromDB('users', { id: parseInt(id) });
+      const { password, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
     } else {
       const userIndex = users.findIndex(u => u.id === parseInt(id));
       if (userIndex !== -1) {
@@ -610,26 +569,17 @@ app.get('/api/orders', async (req, res) => {
   
   try {
     if (db) {
-      let query = `
-        SELECT o.*, u.name as user_name
-        FROM Orders o
-        JOIN Users u ON o.user_id = u.id
-      `;
-      let params = [];
-      
+      let query = {};
       if (user_id) {
-        query += ' WHERE o.user_id = ?';
-        params.push(user_id);
+        query.user_id = parseInt(user_id);
       }
       
-      query += ' ORDER BY o.created_at DESC';
-      
-      const dbOrders = await getFromDB(query, params);
+      const dbOrders = await getFromDB('orders', query, { sort: { created_at: -1 } });
       if (dbOrders) {
-        // Get order items for each order
+        // Add user names
         for (let order of dbOrders) {
-          const items = await getFromDB('SELECT * FROM OrderItems WHERE order_id = ?', [order.id]);
-          order.items = items || [];
+          const user = await getOneFromDB('users', { id: order.user_id });
+          order.user_name = user?.name || 'Unknown';
         }
         return res.json(dbOrders);
       }
@@ -653,25 +603,23 @@ app.post('/api/orders', async (req, res) => {
   
   try {
     if (db) {
-      // Insert order
-      await db.execute(
-        'INSERT INTO Orders (user_id, total_amount, status, delivery_info, payment_method) VALUES (?, ?, ?, ?, ?)',
-        [user_id, total_amount, status, JSON.stringify(delivery_info), payment_method]
-      );
+      const newOrder = {
+        id: nextOrderId++,
+        user_id: parseInt(user_id),
+        total_amount: parseFloat(total_amount),
+        status,
+        delivery_info,
+        payment_method,
+        created_at: new Date(),
+        items: items.map(item => ({
+          product_name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        }))
+      };
       
-      // Get the new order ID
-      const [orderResult] = await db.execute('SELECT LAST_INSERT_ID() as id');
-      const orderId = orderResult[0].id;
-      
-      // Insert order items
-      for (const item of items) {
-        await db.execute(
-          'INSERT INTO OrderItems (order_id, product_id, product_name, quantity, price) VALUES (?, ?, ?, ?, ?)',
-          [orderId, item.id, item.name, item.quantity, item.price]
-        );
-      }
-      
-      res.json({ id: orderId, message: 'Order placed successfully' });
+      await db.collection('orders').insertOne(newOrder);
+      res.json({ id: newOrder.id, message: 'Order placed successfully' });
     } else {
       // Use memory
       const newOrder = {
@@ -708,14 +656,15 @@ app.put('/api/orders/:id', async (req, res) => {
   
   try {
     if (db) {
-      await db.execute('UPDATE Orders SET status = ? WHERE id = ?', [status, id]);
-      const [updatedOrder] = await db.execute(`
-        SELECT o.*, u.name as user_name
-        FROM Orders o
-        JOIN Users u ON o.user_id = u.id
-        WHERE o.id = ?
-      `, [id]);
-      res.json(updatedOrder[0]);
+      await db.collection('orders').updateOne(
+        { id: parseInt(id) },
+        { $set: { status } }
+      );
+      
+      const updatedOrder = await getOneFromDB('orders', { id: parseInt(id) });
+      const user = await getOneFromDB('users', { id: updatedOrder.user_id });
+      updatedOrder.user_name = user?.name || 'Unknown';
+      res.json(updatedOrder);
     } else {
       const orderIndex = orders.findIndex(o => o.id === parseInt(id));
       if (orderIndex !== -1) {
@@ -737,23 +686,21 @@ app.get('/api/transactions', async (req, res) => {
   
   try {
     if (db) {
-      let query = `
-        SELECT t.*, u.name as user_name, p.name as product_name, p.price
-        FROM Transactions t
-        JOIN Users u ON t.user_id = u.id
-        JOIN Products p ON t.product_id = p.id
-      `;
-      let params = [];
-      
+      let query = {};
       if (user_id) {
-        query += ' WHERE t.user_id = ?';
-        params.push(user_id);
+        query.user_id = parseInt(user_id);
       }
       
-      query += ' ORDER BY t.transaction_date DESC';
-      
-      const dbTransactions = await getFromDB(query, params);
+      const dbTransactions = await getFromDB('transactions', query, { sort: { transaction_date: -1 } });
       if (dbTransactions) {
+        // Enrich with user and product data
+        for (let transaction of dbTransactions) {
+          const user = await getOneFromDB('users', { id: transaction.user_id });
+          const product = await getOneFromDB('products', { id: transaction.product_id });
+          transaction.user_name = user?.name || 'Unknown';
+          transaction.product_name = product?.name || 'Unknown';
+          transaction.price = product?.price || 0;
+        }
         return res.json(dbTransactions);
       }
     }
@@ -787,19 +734,28 @@ app.post('/api/transactions', async (req, res) => {
   
   try {
     if (db) {
-      await db.execute(
-        'INSERT INTO Transactions (user_id, product_id, quantity, status) VALUES (?, ?, ?, ?)',
-        [user_id, product_id, quantity, 'ordered']
-      );
-      const [newTransaction] = await db.execute(`
-        SELECT t.*, u.name as user_name, p.name as product_name, p.price
-        FROM Transactions t
-        JOIN Users u ON t.user_id = u.id
-        JOIN Products p ON t.product_id = p.id
-        WHERE t.user_id = ? AND t.product_id = ?
-        ORDER BY t.id DESC LIMIT 1
-      `, [user_id, product_id]);
-      res.json(newTransaction[0]);
+      const newTransaction = {
+        id: nextTransactionId++,
+        user_id: parseInt(user_id),
+        product_id: parseInt(product_id),
+        quantity: parseInt(quantity),
+        status: 'ordered',
+        transaction_date: new Date()
+      };
+      
+      await db.collection('transactions').insertOne(newTransaction);
+      
+      const user = await getOneFromDB('users', { id: newTransaction.user_id });
+      const product = await getOneFromDB('products', { id: newTransaction.product_id });
+      
+      const enrichedTransaction = {
+        ...newTransaction,
+        user_name: user?.name || 'Unknown',
+        product_name: product?.name || 'Unknown',
+        price: product?.price || 0
+      };
+      
+      res.json(enrichedTransaction);
     } else {
       const newTransaction = {
         id: nextTransactionId++,
@@ -835,15 +791,23 @@ app.put('/api/transactions/:id', async (req, res) => {
   
   try {
     if (db) {
-      await db.execute('UPDATE Transactions SET status = ? WHERE id = ?', [status, id]);
-      const [updatedTransaction] = await db.execute(`
-        SELECT t.*, u.name as user_name, p.name as product_name, p.price
-        FROM Transactions t
-        JOIN Users u ON t.user_id = u.id
-        JOIN Products p ON t.product_id = p.id
-        WHERE t.id = ?
-      `, [id]);
-      res.json(updatedTransaction[0]);
+      await db.collection('transactions').updateOne(
+        { id: parseInt(id) },
+        { $set: { status } }
+      );
+      
+      const updatedTransaction = await getOneFromDB('transactions', { id: parseInt(id) });
+      const user = await getOneFromDB('users', { id: updatedTransaction.user_id });
+      const product = await getOneFromDB('products', { id: updatedTransaction.product_id });
+      
+      const enrichedTransaction = {
+        ...updatedTransaction,
+        user_name: user?.name || 'Unknown',
+        product_name: product?.name || 'Unknown',
+        price: product?.price || 0
+      };
+      
+      res.json(enrichedTransaction);
     } else {
       const transactionIndex = transactions.findIndex(t => t.id === parseInt(id));
       if (transactionIndex !== -1) {
@@ -876,10 +840,16 @@ app.post('/api/contact', async (req, res) => {
   
   try {
     if (db) {
-      await db.execute(
-        'INSERT INTO ContactMessages (name, email, subject, message) VALUES (?, ?, ?, ?)',
-        [name, email, subject, message]
-      );
+      const newMessage = {
+        id: nextContactId++,
+        name,
+        email,
+        subject,
+        message,
+        created_at: new Date()
+      };
+      
+      await db.collection('contactMessages').insertOne(newMessage);
     } else {
       const newMessage = {
         id: nextContactId++,
@@ -950,9 +920,18 @@ initDB().then(() => {
     console.log('   Admin: admin@admin.com / admin123');
     console.log('   User: user@user.com / user123');
     if (db) {
-      console.log('💾 Using MySQL database');
+      console.log('💾 Using MongoDB Atlas database');
     } else {
-      console.log('💾 Using in-memory data (MySQL not available)');
+      console.log('💾 Using in-memory data (MongoDB not available)');
     }
   });
+});
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  if (client) {
+    await client.close();
+    console.log('MongoDB connection closed.');
+  }
+  process.exit(0);
 });

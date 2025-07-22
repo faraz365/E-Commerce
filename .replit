@@ -14,7 +14,7 @@ deploymentTarget = "autoscale"
 ignorePorts = false
 
 [workflows]
-runButton = "Start E-Commerce Server"
+runButton = "Start Full Application"
 
 [[workflows.workflow]]
 name = "Start E-Commerce Server"
@@ -24,6 +24,28 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd \"E Commerce Website -/project\" && npm run server"
+
+[[workflows.workflow]]
+name = "Start Full Application"
+author = 45009257
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd \"E Commerce Website -/project\" && npm run server"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd \"E Commerce Website -/project\" && npm run dev"
+
+[[workflows.workflow]]
+name = "Start Frontend Only"
+author = 45009257
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd \"E Commerce Website -/project\" && npm run dev"
 
 [[ports]]
 localPort = 5000

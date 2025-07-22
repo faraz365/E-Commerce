@@ -24,3 +24,7 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd \"E Commerce Website -/project\" && npm run server"
+
+[[ports]]
+localPort = 5000
+externalPort = 80

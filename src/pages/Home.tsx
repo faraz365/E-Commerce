@@ -94,57 +94,6 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const { apiCall, loading, error } = useApi();
 
-  // Socket event listeners for real-time updates
-  useEffect(() => {
-    if (!socket || !socket.connected) return;
-
-    // Product events
-    socket.on('productCreated', (product: Product) => {
-      setProducts(prev => [...prev, product]);
-    });
-
-    socket.on('productUpdated', (product: Product) => {
-      setProducts(prev => prev.map(p => p.id === product.id ? product : p));
-    });
-
-    socket.on('productDeleted', (productId: string) => {
-      setProducts(prev => prev.filter(p => p.id !== productId));
-    });
-
-    // Order events
-    socket.on('orderCreated', (order: Order) => {
-      setOrders(prev => [...prev, order]);
-    });
-
-    socket.on('orderUpdated', (order: Order) => {
-      setOrders(prev => prev.map(o => o.id === order.id ? order : o));
-    });
-
-    // Category events
-    socket.on('categoryCreated', (category: Category) => {
-      setCategories(prev => [...prev, category]);
-    });
-
-    socket.on('categoryUpdated', (category: Category) => {
-      setCategories(prev => prev.map(c => c.id === category.id ? category : c));
-    });
-
-    socket.on('categoryDeleted', (categoryId: string) => {
-      setCategories(prev => prev.filter(c => c.id !== categoryId));
-    });
-
-    return () => {
-      socket.off('productCreated');
-      socket.off('productUpdated');
-      socket.off('productDeleted');
-      socket.off('orderCreated');
-      socket.off('orderUpdated');
-      socket.off('categoryCreated');
-      socket.off('categoryUpdated');
-      socket.off('categoryDeleted');
-    };
-  }, [socket, socket?.connected]);
-
   // Load initial data
   useEffect(() => {
     const loadData = async () => {
